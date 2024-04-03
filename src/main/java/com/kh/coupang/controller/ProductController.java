@@ -3,7 +3,10 @@ package com.kh.coupang.controller;
 import com.kh.coupang.domain.Category;
 import com.kh.coupang.domain.Product;
 import com.kh.coupang.domain.ProductDTO;
+import com.kh.coupang.domain.QProduct;
 import com.kh.coupang.service.ProductService;
+import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -69,11 +72,25 @@ public class ProductController {
         Sort sort = Sort.by("prodCode").descending();
         Pageable pageable = PageRequest.of(page-1, 10,  sort);
 
-        Page<Product> list = service.viewAll(pageable);
-        return
-                category==null?
-                        ResponseEntity.status(HttpStatus.OK).body(list.getContent()) :
-                        ResponseEntity.status(HttpStatus.OK).body(service.viewCategory(category, pageable).getContent());
+        // QueryDSL
+        // 1. 가장 먼저 동적 처리하기 위한 Q도메인 클래스 얻어오기
+        // Q 도메인 클래스를 이용하면 Entity 클래스에 선언된 필드들을 변수로 활용할 수 있음
+        QProduct qProduct = QProduct.product;
+        // 2. WHERE 조건을 쓰기 위해서는 BooleanBuilder가 필요
+        // BooleanBuilder : where문에 들어가는 조건들을 넣어주는 컨테이너
+        BooleanBuilder builder = new BooleanBuilder();
+        // category의 유무 여부가 상황에 따라 다르기 때문에 조건이 필요
+        if(category != null){
+            // 3. 원하는 조건을 필드값과 같이 결합해서 생성
+            BooleanExpression expression = qProduct.category.cateCode.eq(category);
+
+            // 4. 만들어진 조건은 where문에 and나 or 같은 키워드와 결합
+            builder.and(expression);
+        }
+
+        // 5. BooleanBuilder는 QuerydslPredicateExcutor 인터페이스의 findAll() 사용
+        Page<Product> list = service.viewAll(builder, pageable);
+        return ResponseEntity.status(HttpStatus.OK).body(list.getContent());
     }
 
     @GetMapping("/product/{code}")

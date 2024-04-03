@@ -2,6 +2,7 @@ package com.kh.coupang.service;
 
 import com.kh.coupang.domain.Product;
 import com.kh.coupang.repo.ProductDAO;
+import com.querydsl.core.BooleanBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,8 +16,8 @@ public class ProductService {
     private ProductDAO dao;
 
 
-    public Page<Product> viewAll(Pageable pageable) {
-        return dao.findAll(pageable);
+    public Page<Product> viewAll(BooleanBuilder builder, Pageable pageable) {
+        return dao.findAll(builder, pageable);
     }
 
     public Page<Product> viewCategory(int code, Pageable pageable){
