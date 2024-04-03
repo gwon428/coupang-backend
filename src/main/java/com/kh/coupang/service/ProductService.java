@@ -3,6 +3,8 @@ package com.kh.coupang.service;
 import com.kh.coupang.domain.Product;
 import com.kh.coupang.repo.ProductDAO;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,12 +15,12 @@ public class ProductService {
     private ProductDAO dao;
 
 
-    public List<Product> viewAll() {
-        return dao.findAll();
+    public Page<Product> viewAll(Pageable pageable) {
+        return dao.findAll(pageable);
     }
 
-    public List<Product> viewCategory(int code){
-        return dao.findByCateCode(code);
+    public Page<Product> viewCategory(int code, Pageable pageable){
+        return dao.findByCateCode(code, pageable);
     }
 
     public Product view(int code) {

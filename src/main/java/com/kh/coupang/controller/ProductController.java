@@ -7,6 +7,10 @@ import com.kh.coupang.service.ProductService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -60,9 +64,16 @@ public class ProductController {
     }
 
     @GetMapping("/product")
-    public ResponseEntity<List<Product>> viewAll(@RequestParam(name="category", required = false) Integer category) {
-        List<Product> list = service.viewAll();
-        return category==null? ResponseEntity.status(HttpStatus.OK).body(list) : ResponseEntity.status(HttpStatus.OK).body(service.viewCategory(category));
+    public ResponseEntity<List<Product>> viewAll(@RequestParam(name="category", required = false) Integer category, @RequestParam (name="page", defaultValue = "1") int page) {
+        // Sort.by : 정렬 기준 설정, descending : desc
+        Sort sort = Sort.by("prodCode").descending();
+        Pageable pageable = PageRequest.of(page-1, 10,  sort);
+
+        Page<Product> list = service.viewAll(pageable);
+        return
+                category==null?
+                        ResponseEntity.status(HttpStatus.OK).body(list.getContent()) :
+                        ResponseEntity.status(HttpStatus.OK).body(service.viewCategory(category, pageable).getContent());
     }
 
     @GetMapping("/product/{code}")
