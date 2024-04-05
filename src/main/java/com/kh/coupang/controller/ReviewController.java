@@ -1,6 +1,7 @@
 package com.kh.coupang.controller;
 
 import com.kh.coupang.domain.*;
+import com.kh.coupang.service.ReviewCommentService;
 import com.kh.coupang.service.ReviewService;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -13,6 +14,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -20,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,6 +35,9 @@ public class ReviewController {
 
     @Autowired
     private ReviewService service;
+
+    @Autowired
+    private ReviewCommentService comment;
 
     @Value("${spring.servlet.multipart.location}")
     private String uploadPath;
@@ -85,4 +93,75 @@ public class ReviewController {
         return ResponseEntity.status(HttpStatus.OK).body(list.getContent());
     }
 
+    public Object authentication(){
+        SecurityContext securityContext = SecurityContextHolder.getContext();
+        Authentication authentication = securityContext.getAuthentication();
+        return authentication.getPrincipal();
+
+
+    }
+    // 리뷰 댓글 추가
+    @PostMapping("/review/comment")
+    public ResponseEntity createComment(@RequestBody ReviewComment vo){
+
+        Object principal = authentication();
+
+        if(principal instanceof Member){
+            Member user = (Member) principal;
+            vo.setUser(user);
+            return ResponseEntity.ok(comment.create(vo));
+        }
+        return ResponseEntity.badRequest().build();
+    }
+
+    // 상품 1개에 따른 댓글 조회
+    @GetMapping("/public/review/{code}/comment")
+    public ResponseEntity<List<ReviewCommentDTO>> viewComment(@PathVariable("code") int code){
+        // 상위 댓글 리스트
+        List<ReviewComment> topList = comment.getTopLevelComments(code);
+
+        // 상위 댓글을 DTO를 통해 가공
+        List<ReviewCommentDTO> response = new ArrayList<>();
+
+        // ArrayList에 반복문을 통해 가공된 상위 댓글 넣기
+        for(ReviewComment top : topList){
+
+            // 각각 상위 댓글의 revi_code를 통해 하위 댓글 리스트 가져오기
+            List<ReviewComment> replies = comment.getRepliesComments(top.getReviCode(), code);
+
+            // 하위 댓글을 DTO를 통해 가공
+            List<ReviewCommentDTO> repliesDTO = new ArrayList<>();
+
+            // ArrayList에 반복문을 통해 가공된 하위 댓글 넣기
+            for(ReviewComment reply : replies){
+                ReviewCommentDTO dto = ReviewCommentDTO.builder()
+                        .reviCode(reply.getReviComCode())
+                        .reviComCode(reply.getReviComCode())
+                        .reviComDesc(reply.getReviComDesc())
+                        .reviComDate(reply.getReviComDate())
+                        // 댓글에 저장된 user 정보 가져오려면 getUser를 통해 한 번 더 들어가서 정보를 가져와야 함
+                        .user(UserDTO.builder()
+                                .id(reply.getUser().getId())
+                                .name(reply.getUser().getName())
+                                .build())
+                        .build();
+                repliesDTO.add(dto);
+            }
+            
+            // ArrayList에 반복문을 통해 가공된 상위 댓글 넣기 (이 때, (하위 댓글 리스트)repliesDTO list도 넣게 됨)
+            ReviewCommentDTO dto = ReviewCommentDTO.builder()
+                    .reviCode(top.getReviCode())
+                    .reviComCode(top.getReviComCode())
+                    .reviComDesc(top.getReviComDesc())
+                    .reviComDate(top.getReviComDate())
+                    .user(UserDTO.builder()
+                            .id(top.getUser().getId())
+                            .name(top.getUser().getName())
+                            .build())
+                    .replies(repliesDTO)
+                    .build();
+            response.add(dto);
+        }
+        return ResponseEntity.ok(response);
+    }
 }

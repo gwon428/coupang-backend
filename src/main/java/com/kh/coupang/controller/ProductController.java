@@ -1,13 +1,12 @@
 package com.kh.coupang.controller;
 
-import com.kh.coupang.domain.Category;
-import com.kh.coupang.domain.Product;
-import com.kh.coupang.domain.ProductDTO;
-import com.kh.coupang.domain.QProduct;
+import com.kh.coupang.domain.*;
+import com.kh.coupang.service.ProductCommentService;
 import com.kh.coupang.service.ProductService;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.coyote.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -16,12 +15,16 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,6 +35,9 @@ public class ProductController {
 
     @Autowired
     private ProductService service;
+
+    @Autowired
+    private ProductCommentService comment;
 
     @Value("${spring.servlet.multipart.location}")
     private String uploadPath;
@@ -93,12 +99,89 @@ public class ProductController {
         return ResponseEntity.status(HttpStatus.OK).body(list.getContent());
     }
 
+    // 상품 1개 조회
     @GetMapping("/product/{code}")
     public ResponseEntity<Product> view(@PathVariable(name = "code") int code) {
         Product result = service.view(code);
         return ResponseEntity.status(HttpStatus.OK).body(result);
     }
 
+    // 상품 댓글 추가
+    @PostMapping("/product/comment")
+    public ResponseEntity createComment(@RequestBody ProductComment vo){
+
+        // 시큐리티에 로그인한 사용자의 정보 가져오기
+        SecurityContext securityContext = SecurityContextHolder.getContext();
+        // Context에 담은 인증 정보 가져오기
+        Authentication authentication = securityContext.getAuthentication();
+        // principal 객체에 담기
+        Object principal = authentication.getPrincipal();
+
+        if(principal instanceof Member){
+            // principal이 Member인지 체크를 거쳐야 Member로 형변환이 가능
+            Member user = (Member) principal;
+            // Comment에 user 정보 담기
+            vo.setUser(user);
+            return ResponseEntity.ok(comment.create(vo));
+        }
+
+        log.info("vo : " + vo);
+        return ResponseEntity.badRequest().build();
+    }
+/*
+    // 상품 1개에 따른 댓글 조회
+    @GetMapping("/product/{code}/comment")
+    public ResponseEntity<List<ProductComment>> viewComment(@PathVariable("code") int code){
+        return ResponseEntity.ok(comment.findByProdCode(code));
+    }
+*/
+
+    // 상품 1개에 따른 댓글 조회 -> 전체 다 보여줘야 하는 상황!
+    @GetMapping("/public/product/{code}/comment")
+    public ResponseEntity<List<ProductCommentDTO>> viewComment(@PathVariable("code") int code){
+        List<ProductComment> topList = comment.getTopLevelComments(code);
+        // 상위댓글(topList)을 가공
+        List<ProductCommentDTO> response = new ArrayList<> ();
+
+        for(ProductComment top : topList){
+
+            // 각각 top의 하위 댓글 list 가져오기
+            List<ProductComment> replies = comment.getRepliesComments(top.getProComCode(), code);
+            List<ProductCommentDTO> repliesDTO = new ArrayList<>();
+
+            // 하위댓글 처리
+            for(ProductComment reply : replies){
+                ProductCommentDTO dto = ProductCommentDTO.builder()
+                        .prodCode(reply.getProdCode())
+                        .proComCode(reply.getProComCode())
+                        .proComDesc(reply.getProComDesc())
+                        .proComDate(reply.getProComDate())
+                        .user(UserDTO.builder()
+                                .id(reply.getUser().getId())
+                                .name(reply.getUser().getName())
+                                .build())
+                        .build();
+                repliesDTO.add(dto);
+            }
+
+            ProductCommentDTO dto = ProductCommentDTO.builder()
+                    .prodCode(top.getProdCode())
+                    .proComCode(top.getProComCode())
+                    .proComDesc(top.getProComDesc())
+                    .proComDate(top.getProComDate())
+                    // user 후가공..
+                    .user(UserDTO.builder()
+                            .id(top.getUser().getId())
+                            .name(top.getUser().getName())
+                            .build())
+                    .replies(repliesDTO)
+                    .build();
+
+            response.add(dto);
+        }
+
+        return ResponseEntity.ok(response);
+    }
     @PutMapping("/product")
     public ResponseEntity<Product> update(ProductDTO dto) throws IOException {
 
@@ -196,6 +279,7 @@ public class ProductController {
         // 보내는 게 없을 때는 body()가 아닌 build()로
         return (target != null) ? ResponseEntity.status(HttpStatus.ACCEPTED).body(target) : ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
     }
+
 
     @DeleteMapping("/product/{code}")
     public ResponseEntity<Product> delete(@PathVariable("code") int code) {

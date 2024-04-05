@@ -44,7 +44,9 @@ public class SecurityConfig {
         http.authorizeHttpRequests(authorize ->
                 authorize
                         // 회원가입만 허용 -> 기존에 되던 전체보기 등등도 안됨
-                .requestMatchers("/signUp", "/login").permitAll()
+                        // /api/public/** => 인증 없이 사용자가 쓸 수 있도록 하기 위한 것들에 public 달기
+                        // ex) @GetMapping("/public/...")
+                .requestMatchers("/signUp", "/login", "/api/public/**").permitAll()
                         // hasRole("USER") -> USER만 가능하도록 (SpringSecurity가 ROLE_를 자동으로 인식
                         .requestMatchers("/api/product").hasAnyRole("USER")
                         .anyRequest().authenticated())
