@@ -31,6 +31,7 @@ import java.util.UUID;
 @Slf4j
 @RequestMapping("/api/*")
 @RestController
+@CrossOrigin(origins = {"*"}, maxAge = 6000)
 public class ReviewController {
 
     @Autowired
@@ -77,19 +78,25 @@ public class ReviewController {
                 ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
     }
 
-    @GetMapping("/review")
-    public ResponseEntity<List<Review>> viewAll(@RequestParam(name="prodCode", required = false) Integer prodCode, @RequestParam(name="page", defaultValue = "1") int page){
+
+    // http://localhost:8080/api/public/product/72/review
+    // 상품 1개에 따른 리뷰 전체 보기
+    @GetMapping("/public/product/{code}/review")
+    public ResponseEntity<List<Review>> viewAll(@PathVariable(name="code") int code, @RequestParam(name="page", defaultValue = "1") int page){
         Sort sort = Sort.by("reviCode").descending();
         Pageable pageable = PageRequest.of(page-1, 10, sort);
 
         QReview qReview = QReview.review;
         BooleanBuilder builder = new BooleanBuilder();
-        if(prodCode != null){
-            BooleanExpression expression = qReview.prodCode.eq(prodCode);
-            builder.and(expression);
-        }
 
-        Page<Review> list = service.viewAll(builder, pageable);
+        BooleanExpression expression = qReview.prodCode.eq(code);
+        builder.and(expression);
+//        if(code != null){
+//            BooleanExpression expression = qReview.prodCode.eq(code);
+//            builder.and(expression);
+//        }
+
+        Page<Review> list = service.viewAll(pageable, builder);
         return ResponseEntity.status(HttpStatus.OK).body(list.getContent());
     }
 
@@ -147,7 +154,7 @@ public class ReviewController {
                         .build();
                 repliesDTO.add(dto);
             }
-            
+
             // ArrayList에 반복문을 통해 가공된 상위 댓글 넣기 (이 때, (하위 댓글 리스트)repliesDTO list도 넣게 됨)
             ReviewCommentDTO dto = ReviewCommentDTO.builder()
                     .reviCode(top.getReviCode())

@@ -30,7 +30,7 @@ public class ReviewService {
         return image.save(vo);
     }
 
-    public Page<Review> viewAll(BooleanBuilder builder, Pageable pageable){
+    public Page<Review> viewAll(Pageable pageable, BooleanBuilder builder){
         return review.findAll(builder, pageable);
     }
 

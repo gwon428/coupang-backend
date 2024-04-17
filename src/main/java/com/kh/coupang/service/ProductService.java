@@ -15,7 +15,6 @@ public class ProductService {
     @Autowired
     private ProductDAO dao;
 
-
     public Page<Product> viewAll(BooleanBuilder builder, Pageable pageable) {
         return dao.findAll(builder, pageable);
     }
